@@ -50,6 +50,11 @@ See legend how the colours map onto the stages.
 Press ESCAPE or Q to exit chiaharvestgraph.
 
 
+## Did you know that...
+
+* Chia Plot Graph has a companion app called [Chia Harvest Graph](https://github.com/stolk/chiaharvestgraph).
+
+
 ## Donations
 
 Chia Harvest Graph is a tool by Bram Stolk, who is on Twitter as: @BramStolk where he mostly tweets about game development.

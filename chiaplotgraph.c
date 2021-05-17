@@ -334,6 +334,32 @@ static void setup_postscript(void)
 }
 
 
+static time_t average_plot_time( void )
+{
+	time_t total=0;
+	int num=0;
+
+	for ( int lognr=0; lognr<numl; ++lognr)
+	{
+		hist_t* h = hist+lognr;
+		int cur = h->head;
+		while ( cur != h->tail )
+		{
+			const run_t* r = h->runs + cur;
+			if ( r->stamps[0] && r->stamps[5] )
+			{
+				const time_t delta = r->stamps[5] - r->stamps[0];
+				assert( delta > 0 );
+				total += delta;
+				num++;
+			}
+			cur = (cur+1) % MAXHIST;
+		}
+	}
+	return total / num;
+}
+
+
 static void setup_scale(void)
 {
 	strncpy( overlay + imw - 4, "NOW", 4 );
@@ -371,7 +397,18 @@ static void update_drivespace_info(void)
 		unsigned long free_farm = stat_farm.f_bsize * stat_farm.f_bfree;
 		free_temp = free_temp / ( 1UL << 30 );
 		free_farm = free_farm / ( 1UL << 30 );
-		snprintf( overlay+0, imw/2-1, "Avail %s:%luGiB  %s:%luGiB", dirname_temp, free_temp, dirname_farm, free_farm );
+		const time_t num_minutes = average_plot_time() / 60;
+		const int hr = (int) (num_minutes / 60);
+		const int mn = (int) (num_minutes % 60);
+		snprintf
+		(
+			overlay+0,
+			imw/2-1,
+			"Avail %s: %luGiB  %s: %luGiB  AvgTime: %dh%02dm  ",
+			dirname_temp, free_temp,
+			dirname_farm, free_farm,
+			hr, mn
+		);
 	}
 }
 
@@ -391,7 +428,7 @@ static int get_stage( int lognr, time_t t )
 				if ( !t1 || t < t1 )
 					return j;
 		}
-		cur++;
+		cur = (cur+1) % MAXHIST;
 	}
 	return -1;
 }

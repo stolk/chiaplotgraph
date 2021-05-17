@@ -20,6 +20,11 @@
 
 // Copy time = 439.956 seconds. CPU (36.830%) Sat May 15 19:14:36 2021
 
+// Starting plotting progress into temporary dirs: /mnt/scratch0 and /mnt/scratch0
+
+// Renamed final file from "/mnt/farm2/plots/plot-k32-2021-05-16-21-46-c6690ea28d9f8ef79e10b7d4e826bfd3431532220c0b97737f7ce27f302be925.plot.2.tmp" to "/mnt/farm2/plots/plot-k32-2021-05-16-21-46-c6690ea28d9f8ef79e10b7d4e826bfd3431532220c0b97737f7ce27f302be925.plot"
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,6 +33,7 @@
 #include <fcntl.h>
 #include <sys/select.h>
 #include <sys/ioctl.h>
+#include <sys/statvfs.h>
 #include <time.h>
 #include <limits.h>
 #include <errno.h>
@@ -55,16 +61,23 @@ enum stage_t
 	NUMSTAGES
 };
 
-#define NUMWATCH		(NUMSTAGES+1)
+#define NUMWATCH		(NUMSTAGES+1 + 2)
 static const char* watchphrases[NUMWATCH] =
 {
+	// Watch the phrases that mark a stage transition.
 	"Starting phase 1/4:",
 	"Starting phase 2/4:",
 	"Starting phase 3/4:",
 	"Starting phase 4/4:",
 	"Time for phase 4 = ",
 	"Copy time = ",
+	// Watch the phrases that tell us where the drives are.
+	"Starting plotting ",
+	"Renamed final file from ",
 };
+
+static char dirname_temp[256];
+static char dirname_farm[256];
 
 
 typedef struct run
@@ -189,7 +202,28 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 		{
 			if ( !strncmp( line, watchphrases[i], strlen(watchphrases[i] ) ) )
 			{
-				match = i;
+				if ( i<NUMSTAGES+1 )
+					match = i;
+				else if ( i==6 && !dirname_temp[0])
+				{
+					const char* s0 = strstr( line, "dirs: " );
+					assert( s0 );
+					s0 += 6;
+					const char* s1 = strstr( s0, " and " );
+					assert( s1 );
+					strncpy(dirname_temp, s0, s1-s0);
+					fprintf(stderr,"tmp dirname: %s\n", dirname_temp);
+				}
+				else if ( i==7 && !dirname_farm[0])
+				{
+					const char* s0 = strchr( line, '"' );
+					assert( s0 );
+					s0 += 1;
+					const char* s1 = strstr( s0, "/plot-" );
+					assert( s1 );
+					strncpy(dirname_farm, s0, s1-s0);
+					fprintf(stderr,"frm dirname: %s\n", dirname_farm);
+				}
 			}
 		}
 	}
@@ -223,9 +257,10 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 			if ( r )
 			{
 				r->stamps[match] = t;
-				fprintf(stderr, "Set timestamp %d/%d to %zd\n", lognr, match, t);
+				//fprintf(stderr, "Set timestamp %d/%d to %zd\n", lognr, match, t);
 			}
 		}
+		newest_stamp = t;
 	}
 }
 
@@ -271,7 +306,6 @@ static int read_log_file(int lognr)
 		linesread++;
 	} while(1);
 }
-
 
 
 static void setup_postscript(void)
@@ -322,6 +356,27 @@ static void setup_scale(void)
 }
 
 
+static void update_drivespace_info(void)
+{
+	if ( dirname_temp[0] && dirname_farm[0] )
+	{
+		struct statvfs stat_temp;
+		struct statvfs stat_farm;
+		memset( &stat_temp, 0, sizeof(struct statvfs) );
+		memset( &stat_farm, 0, sizeof(struct statvfs) );
+		int rv0 = statvfs(dirname_temp, &stat_temp );
+		if ( rv0 ) error( EXIT_FAILURE, errno, "statvfs() on temp dir failed" );
+		int rv1 = statvfs(dirname_farm, &stat_farm );
+		if ( rv1 ) error( EXIT_FAILURE, errno, "statvfs() on farm dir failed" );
+		unsigned long free_temp = stat_temp.f_bsize * stat_temp.f_bfree;
+		unsigned long free_farm = stat_farm.f_bsize * stat_farm.f_bfree;
+		free_temp = free_temp / ( 1UL << 30 );
+		free_farm = free_farm / ( 1UL << 30 );
+		snprintf( overlay+0, imw/2-1, "Avail %s:%luGiB  %s:%luGiB", dirname_temp, free_temp, dirname_farm, free_farm );
+	}
+}
+
+
 static int get_stage( int lognr, time_t t )
 {
 	hist_t* h = hist+lognr;
@@ -335,10 +390,7 @@ static int get_stage( int lognr, time_t t )
 			const time_t t1 = r->stamps[j+1];
 			if ( t0 && t >= t0 )
 				if ( !t1 || t < t1 )
-				{
-					fprintf(stderr,"%zd is in stage %d\n", t, j);
 					return j;
-				}
 		}
 		cur++;
 	}
@@ -397,6 +449,7 @@ static int update_image(void)
 
 	if (redraw)
 	{
+		update_drivespace_info();
 		time_t now = time(0);
 		int rowmap[imh];
 		memset(rowmap,-1,sizeof(rowmap));

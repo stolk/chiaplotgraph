@@ -1,28 +1,7 @@
 // chiaplotgraph.c
 // 
-// (c)2021 by Abraham Stolk.
+// (c)2021 by Bram Stolk.
 // XCH Donations: xch1zfgqfqfdse3e2x2z9lscm6dx9cvd5j2jjc7pdemxjqp0xp05xzps602592
-
-
-// Starting phase 1/4: Forward Propagation into tmp files... Sat May 15 19:14:40 2021
-
-// Time for phase 1 = 8297.374 seconds. CPU (170.770%) Sat May 15 15:35:41 2021
-
-// Starting phase 2/4: Backpropagation into tmp files... Sat May 15 15:35:41 2021
-
-// Starting phase 3/4: Compression from tmp files into "/mnt/scratch1/plot-k32-2021-05-15-13-17-6f4bafcffbfc23e6031b4408e72175994be47153df8ae29ac01e51944fec214d.plot.2.tmp" ... Sat May 15 16:42:52 2021
-
-// Time for phase 3 = 8058.557 seconds. CPU (98.350%) Sat May 15 18:57:11 2021
-
-// Starting phase 4/4: Write Checkpoint tables into "/mnt/scratch1/plot-k32-2021-05-15-13-17-6f4bafcffbfc23e6031b4408e72175994be47153df8ae29ac01e51944fec214d.plot.2.tmp" ... Sat May 15 18:57:11 2021
-
-// Time for phase 4 = 604.377 seconds. CPU (99.150%) Sat May 15 19:07:15 2021
-
-// Copy time = 439.956 seconds. CPU (36.830%) Sat May 15 19:14:36 2021
-
-// Starting plotting progress into temporary dirs: /mnt/scratch0 and /mnt/scratch0
-
-// Renamed final file from "/mnt/farm2/plots/plot-k32-2021-05-16-21-46-c6690ea28d9f8ef79e10b7d4e826bfd3431532220c0b97737f7ce27f302be925.plot.2.tmp" to "/mnt/farm2/plots/plot-k32-2021-05-16-21-46-c6690ea28d9f8ef79e10b7d4e826bfd3431532220c0b97737f7ce27f302be925.plot"
 
 
 #include <stdio.h>
@@ -51,6 +30,7 @@
 
 #define	MAXHIST			512		// Record up to 512 plots from the logs.
 
+// The four plotting stages, plus a copy stage.
 enum stage_t
 {
 	ST_FORW=0,
@@ -76,21 +56,21 @@ static const char* watchphrases[NUMWATCH] =
 	"Renamed final file from ",
 };
 
-static char dirname_temp[256];
-static char dirname_farm[256];
+static char dirname_temp[256];	// Name of dir where we store temp files.
+static char dirname_farm[256];	// Name of dir where we store plot files.
 
 
 typedef struct run
 {
-	time_t	stamps[6];
+	time_t	stamps[6];	// Stage-transition timestamps. 0 if not yet reached.
 } run_t;
 
 
 typedef struct hist
 {
-	run_t runs[MAXHIST];
-	int head;
-	int tail;
+	run_t runs[MAXHIST];	// Time-stamps for each plot.
+	int head;		// Head of circular list.
+	int tail;		// Tail of circular list.
 } hist_t;
 
 
@@ -99,7 +79,7 @@ static uint8_t stagecolours[ NUMSTAGES ][ 3 ] =
 	0xe9,0xeb,0x2e,
 	0x50,0xb4,0x90,
 	0x2e,0x5e,0xc0,
-	0xf7,0x47,0x0e,
+	0xf7,0xa7,0x0e,
 	0xaa,0xaa,0xaa,
 };
 
@@ -190,9 +170,7 @@ int num_entries( int lognr )
 }
 
 
-// Parses log entries that look like this:
-// 2021-05-13T09:14:35.538 harvester chia.harvester.harvester: INFO     0 plots were eligible for farming c1c8456f7a... Found 0 proofs. Time: 0.00201 s. Total 36 plots
-
+// See if the line contains one of the phrases that we are watching for...
 static void analyze_line(int lognr, const char* line, ssize_t length)
 {
 	int match=-1;
@@ -227,6 +205,7 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 			}
 		}
 	}
+	// Did we see a phrase that signals transition to the next stage?
 	if ( match >= 0 )
 	{
 		const char* datestr = line + strlen(line) - 21;
@@ -249,6 +228,7 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 	
 		if ( match == 0 )
 		{
+			// We've started a new phase1, which means: a new plot! Expand the history.
 			add_run(lognr, t);
 		}
 		else
@@ -265,46 +245,62 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 }
 
 
-static int read_log_file(int lognr)
+static int read_log_files(void)
 {
-	assert( lognr>=0 && lognr<numl );
-	FILE* f_log = logfiles[lognr];
-	assert( f_log );
 	static char* line = 0;
 	static size_t linesz=MAXLINESZ;
 	if ( !line )
 		line = (char*)malloc(MAXLINESZ);
-
 	int linesread = 0;
-	do
+
+	while ( 1 )
 	{
+		// Which log files have data waiting, ready to read?
 		struct timeval tv = { 0L, WAIT_BETWEEN_SELECT_US };
 		fd_set rdset;
 		FD_ZERO(&rdset);
-		int log_fds = fileno( f_log );
-		FD_SET( log_fds, &rdset );
-		const int ready = select( log_fds+1, &rdset, NULL, NULL, &tv);
-
+		int hi=0;
+		for ( int l=0; l<numl; ++l )
+		{
+			FILE* f_log = logfiles[l];
+			assert(f_log);
+			const int log_fds = fileno( f_log );
+			FD_SET( log_fds, &rdset );
+			hi = log_fds > hi ? log_fds : hi;
+		}
+		const int ready = select( hi+1, &rdset, NULL, NULL, &tv );
 		if ( ready < 0 )
 			error( EXIT_FAILURE, errno, "select() failed" );
-
 		if ( ready == 0 )
-		{
-			//fprintf( stderr, "No descriptors ready for reading.\n" );
 			return linesread;
-		}
 
-		const ssize_t ll = getline( &line, &linesz, f_log );
-		if ( ll <= 0 )
+		// rdset will now tell us which filedescriptors are ready for reading.
+		int added=0;
+		for ( int l=0; l<numl; ++l )
 		{
-			//fprintf( stderr, "getline() returned %zd\n", ll );
-			clearerr( f_log );
-			return linesread;
+			FILE* f_log = logfiles[l];
+			assert(f_log);
+			const int log_fds = fileno( f_log );
+			if ( FD_ISSET( log_fds, &rdset ) )
+			{
+				// This one is ready to read.
+				const ssize_t ll = getline( &line, &linesz, f_log );
+				if ( ll <= 0 )
+				{
+					clearerr( f_log );
+				}
+				else
+				{
+					linesread++;
+					added++;
+					analyze_line( l, line, ll );
+				}
+			}
 		}
-
-		analyze_line( lognr, line, ll );
-		linesread++;
-	} while(1);
+		// None of the log files had data, this iteration. We should abort the loop.
+		if ( !added )
+			return linesread;
+	}
 }
 
 
@@ -314,6 +310,7 @@ static void setup_postscript(void)
 	const uint8_t* c1 = stagecolours[1];
 	const uint8_t* c2 = stagecolours[2];
 	const uint8_t* c3 = stagecolours[3];
+	const uint8_t* c4 = stagecolours[4];
 	snprintf
 	(
 		postscript,
@@ -324,13 +321,15 @@ static void setup_postscript(void)
 		SETFG "%d;%d;%dm" "%s"
 		SETFG "%d;%d;%dm" "%s"
 		SETFG "%d;%d;%dm" "%s"
+		SETFG "%d;%d;%dm" "%s"
 		SETFG "255;255;255m",
 
 		0x00,0x00,0x00,
 		c0[0],c0[1],c0[2], "STAGE1  ",
 		c1[0],c1[1],c1[2], "STAGE2  ",
 		c2[0],c2[1],c2[2], "STAGE3  ",
-		c3[0],c3[1],c3[2], "STAGE4  "
+		c3[0],c3[1],c3[2], "STAGE4  ",
+		c4[0],c4[1],c4[2], "COPY  "
 	);
 }
 
@@ -519,9 +518,7 @@ int main(int argc, char *argv[])
 	int done=0;
 	do
 	{
-		// read files....
-		for ( int i=0; i<numl; ++i )
-			read_log_file(i);
+		read_log_files();
 
 		update_image();
 

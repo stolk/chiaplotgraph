@@ -406,7 +406,7 @@ static int update_image(void)
 			if ( y < imh )
 				rowmap[y] = l;
 		}
-		for (int y=2; y<imh-1; ++y)
+		for (int y=2; y<imh; ++y)
 		{
 			int r = rowmap[y];
 			draw_row( r, y, now );

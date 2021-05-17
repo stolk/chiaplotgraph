@@ -95,7 +95,7 @@ static void setup_image_double_col(void)
 			uint32_t r = 0x30;
 			uint32_t a = 0xff;
 			uint32_t colour = a<<24 | b<<16 | g<<8 | r<<0;
-			im[y * imw + x] = x == 0 || x == imw - 1 || y == 2 || y == imh - 1 ? colour : 0x0;
+			im[y * imw + x] = x == 0 || x == imw - 1 ? colour : 0x0;
 		}
 }
 

@@ -6,7 +6,7 @@ Monitor for Chia Plotting
 
 ## Introduction
 
-The chiaharvestgraph tool will graph Chia Plotting activity in a linux terminal. Use a 24-bit colour terminal, like xterm or gnome-terminal.
+The chiaplottgraph tool will graph Chia Plotting activity in a linux terminal. Use a 24-bit colour terminal, like xterm or gnome-terminal.
 
 
 ## Building
@@ -47,7 +47,7 @@ See legend how the colours map onto the stages.
 
 ## Keys
 
-Press ESCAPE or Q to exit chiaharvestgraph.
+Press ESCAPE or Q to exit chiaplotgraph.
 
 
 ## Did you know that...
@@ -57,7 +57,7 @@ Press ESCAPE or Q to exit chiaharvestgraph.
 
 ## Donations
 
-Chia Harvest Graph is a tool by Bram Stolk, who is on Twitter as: @BramStolk where he mostly tweets about game development.
+Chia Plot Graph is a tool by Bram Stolk, who is on Twitter as: @BramStolk where he mostly tweets about game development.
 
 If you find this tool useful, donations can go to XCH wallet:
 xch1zfgqfqfdse3e2x2z9lscm6dx9cvd5j2jjc7pdemxjqp0xp05xzps602592
@@ -70,5 +70,5 @@ xch1zfgqfqfdse3e2x2z9lscm6dx9cvd5j2jjc7pdemxjqp0xp05xzps602592
 
 ## Copyright
 
-chiaharvestgraph is (c)2021 by Bram Stolk and licensed under the MIT license.
+chiaplotgraph is (c)2021 by Bram Stolk and licensed under the MIT license.
 

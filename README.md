@@ -6,7 +6,7 @@ Monitor for Chia Plotting
 
 ## Introduction
 
-The chiaplottgraph tool will graph Chia Plotting activity in a linux terminal. Use a 24-bit colour terminal, like xterm or gnome-terminal.
+The chiaplotgraph tool will graph Chia Plotting activity in a linux terminal. Use a 24-bit colour terminal, like xterm or gnome-terminal.
 
 
 ## Building

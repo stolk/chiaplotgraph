@@ -469,7 +469,8 @@ static void draw_row( int lognr, int rownr, time_t now )
 
 static int update_image(void)
 {
-	int redraw=0;
+	static int callcount=0;
+	int redraw = ( (callcount++ & 0x31) == 0 ? 1 : 0 );	// Don't go too long (16secs) without redraws.
 	const char* skipdraw = getenv("SKIPDRAW");
 
 	if ( grapher_resized )

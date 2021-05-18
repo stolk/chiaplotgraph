@@ -356,6 +356,7 @@ static time_t average_plot_time( void )
 			cur = (cur+1) % MAXHIST;
 		}
 	}
+	if ( !num ) return 0;
 	return total / num;
 }
 

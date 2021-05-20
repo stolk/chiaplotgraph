@@ -438,7 +438,7 @@ static int get_stage( int lognr, time_t t )
 static void draw_row( int lognr, int rownr, time_t now )
 {
 	time_t t = now;
-	uint32_t* writer = im + rownr * imw + imw - 2;
+	uint32_t* writer = im + rownr * imw + imw - 3;
 	for ( int i=0; i<imw-2; ++i )
 	{
 		const int band = ( t / 900 / 4 ) & 1;

@@ -192,15 +192,22 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 					strncpy(dirname_temp, s0, s1-s0);
 					fprintf(stderr,"tmp dirname: %s\n", dirname_temp);
 				}
-				else if ( i==7 && !dirname_farm[0])
+				else if ( i==7)
 				{
-					const char* s0 = strchr( line, '"' );
-					assert( s0 );
-					s0 += 1;
-					const char* s1 = strstr( s0, "/plot-" );
-					assert( s1 );
-					strncpy(dirname_farm, s0, s1-s0);
-					fprintf(stderr,"frm dirname: %s\n", dirname_farm);
+					if ( !dirname_farm[0] )
+					{
+						const char* s0 = strchr( line, '"' );
+						assert( s0 );
+						s0 += 1;
+						const char* s1 = strstr( s0, "/plot-" );
+						assert( s1 );
+						strncpy(dirname_farm, s0, s1-s0);
+						fprintf(stderr,"frm dirname: %s\n", dirname_farm);
+					}
+					// Some people run with same tmp2 and destination folder, and have no "Copy time" entry.
+					run_t* r = current_run( lognr );
+					if ( r && r->stamps[5] == 0 )
+						r->stamps[5] = r->stamps[4];
 				}
 			}
 		}
@@ -390,14 +397,21 @@ static void update_drivespace_info(void)
 		struct statvfs stat_farm;
 		memset( &stat_temp, 0, sizeof(struct statvfs) );
 		memset( &stat_farm, 0, sizeof(struct statvfs) );
+
 		int rv0 = statvfs(dirname_temp, &stat_temp );
-		if ( rv0 ) error( EXIT_FAILURE, errno, "statvfs() on temp dir failed" );
 		int rv1 = statvfs(dirname_farm, &stat_farm );
-		if ( rv1 ) error( EXIT_FAILURE, errno, "statvfs() on farm dir failed" );
-		unsigned long free_temp = stat_temp.f_bsize * stat_temp.f_bfree;
-		unsigned long free_farm = stat_farm.f_bsize * stat_farm.f_bfree;
-		free_temp = free_temp / ( 1UL << 30 );
-		free_farm = free_farm / ( 1UL << 30 );
+
+		unsigned long free_temp=0;
+		unsigned long free_farm=0;
+
+		if ( !rv0 && !rv1 )
+		{
+			free_temp = stat_temp.f_bsize * stat_temp.f_bfree;
+			free_farm = stat_farm.f_bsize * stat_farm.f_bfree;
+			free_temp = free_temp / ( 1UL << 30 );
+			free_farm = free_farm / ( 1UL << 30 );
+		}
+
 		const time_t num_minutes = average_plot_time() / 60;
 		const int hr = (int) (num_minutes / 60);
 		const int mn = (int) (num_minutes % 60);

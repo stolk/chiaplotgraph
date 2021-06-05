@@ -200,6 +200,8 @@ static void analyze_line(int lognr, const char* line, ssize_t length)
 						assert( s0 );
 						s0 += 1;
 						const char* s1 = strstr( s0, "/plot-" );
+						if ( !s1 )	// We may be running on MSWindows, I guess.
+							s1 = strstr( s0, "\\plot-" );
 						assert( s1 );
 						strncpy(dirname_farm, s0, s1-s0);
 						fprintf(stderr,"frm dirname: %s\n", dirname_farm);
